@@ -69,7 +69,16 @@ jobs:
         run: |
           aws eks update-kubeconfig --name cluster --region us-east-1
 
+      - name: Uncordon Nodes
+        run: |
+          kubectl uncordon $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}') || true
+
       - name: Deploy Frontend Manifests
         run: |
           kubectl apply -k starter/frontend/k8s/ || kubectl apply -f starter/frontend/k8s/
           kubectl rollout restart deployment frontend 2>/dev/null || true
+
+      - name: Verify Cluster and Pods
+        run: |
+          kubectl get nodes -o wide
+          kubectl get pods -A
