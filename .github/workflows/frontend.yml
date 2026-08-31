@@ -65,44 +65,54 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Update Kubeconfig & Ensure Node Group Exists
+      - name: Create or Scale Node Group
         run: |
           aws eks update-kubeconfig --name cluster --region us-east-1
-          
-          # Check existing nodegroups
-          NODEGROUPS=$(aws eks list-nodegroups --cluster-name cluster --region us-east-1 --query "nodegroups" --output text)
-          echo "Existing Nodegroups: $NODEGROUPS"
-          
-          if [ -z "$NODEGROUPS" ] || [ "$NODEGROUPS" == "None" ]; then
-            echo "Creating missing Node Group..."
-            SUBNETS=$(aws ec2 describe-subnets --filters "Name=tag:aws:eks:cluster-name,Values=cluster" --query "Subnets[*].SubnetId" --output text | tr '\t' ' ')
-            if [ -z "$SUBNETS" ]; then
-              SUBNETS=$(aws ec2 describe-subnets --query "Subnets[0:2].SubnetId" --output text | tr '\t' ' ')
-            fi
-            
+
+          # Find exact node role in account
+          NODE_ROLE=$(aws iam list-roles --query "Roles[?contains(RoleName, 'node') || contains(RoleName, 'Node')].Arn" --output text | awk '{print $1}')
+          if [ -z "$NODE_ROLE" ] || [ "$NODE_ROLE" == "None" ]; then
+            NODE_ROLE=$(aws iam list-roles --query "Roles[0].Arn" --output text)
+          fi
+          echo "Using Node Role: $NODE_ROLE"
+
+          # Find subnets
+          SUBNETS=$(aws ec2 describe-subnets --query "Subnets[?VpcId==\`$(aws ec2 describe-vpcs --query 'Vpcs[0].VpcId' --output text)\`].SubnetId" --output text | tr '\t' ' ')
+          if [ -z "$SUBNETS" ]; then
+            SUBNETS=$(aws ec2 describe-subnets --query "Subnets[0:2].SubnetId" --output text | tr '\t' ' ')
+          fi
+          echo "Using Subnets: $SUBNETS"
+
+          # Check if nodegroup exists or needs creation
+          NODEGROUP=$(aws eks list-nodegroups --cluster-name cluster --region us-east-1 --query "nodegroups[0]" --output text)
+          if [ "$NODEGROUP" != "None" ] && [ -n "$NODEGROUP" ]; then
+            echo "Scaling existing nodegroup: $NODEGROUP"
+            aws eks update-nodegroup-config --cluster-name cluster --nodegroup-name "$NODEGROUP" --scaling-config minSize=1,maxSize=2,desiredSize=1 --region us-east-1 || true
+          else
+            echo "Creating nodegroup 'main-nodes'..."
             aws eks create-nodegroup \
               --cluster-name cluster \
-              --nodegroup-name cluster-node-group \
+              --nodegroup-name main-nodes \
               --subnets $SUBNETS \
-              --node-role arn:aws:iam::262228716411:role/cluster-node-group-2024 \
+              --node-role "$NODE_ROLE" \
               --instance-types t3.medium \
               --scaling-config minSize=1,maxSize=2,desiredSize=1 \
-              --region us-east-1 || true
+              --region us-east-1
           fi
 
       - name: Wait for Nodes & Uncordon
         run: |
-          echo "Waiting for worker node to register with cluster..."
-          for i in {1..30}; do
-            NODE_COUNT=$(kubectl get nodes --no-headers 2>/dev/null | wc -l)
+          echo "Waiting for worker nodes to register..."
+          for i in {1..36}; do
+            NODE_COUNT=$(kubectl get nodes --no-headers 2>/dev/null | grep -v "NotReady" | wc -l)
             if [ "$NODE_COUNT" -gt 0 ]; then
-              echo "Node joined the cluster!"
+              echo "Node is ready!"
               break
             fi
-            echo "Waiting for node (attempt $i/30)..."
+            echo "Waiting (attempt $i/36)..."
             sleep 10
           done
-          
+
           kubectl uncordon $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}') 2>/dev/null || true
 
       - name: Deploy Frontend Manifests
