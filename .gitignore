@@ -4,3 +4,11 @@
 *.tfstate.*
 
 run_setup.sh
+credentials
+fix_and_run.sh
+check_nodes.sh
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+setup/aws-iam-authenticatior
