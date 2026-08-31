@@ -1,0 +1,85 @@
+name: Backend CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'starter/backend/**'
+      - '.github/workflows/backend-ci.yml'
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          cd starter/backend
+          pip install --upgrade pip
+          pip install pipenv flake8 pytest
+          pipenv install --dev --system || pipenv install --system
+
+      - name: Lint with Flake8
+        run: |
+          cd starter/backend
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Run Backend Tests
+        run: |
+          cd starter/backend
+          pytest test_app.py
+
+  build-and-push:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, Tag, and Push Backend Image
+        env:
+          ECR_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_BASE }}
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/backend:$IMAGE_TAG ./starter/backend
+          docker push $ECR_REGISTRY/backend:$IMAGE_TAG
+          docker build -t $ECR_REGISTRY/backend:${{ github.sha }} ./starter/backend
+          docker push $ECR_REGISTRY/backend:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Update Kubeconfig
+        run: |
+          aws eks update-kubeconfig --name cluster --region us-east-1
+
+      - name: Deploy Backend Manifests
+        run: |
+          kubectl apply -k starter/backend/k8s/ || kubectl apply -f starter/backend/k8s/
+          kubectl rollout restart deployment backend 2>/dev/null || true
