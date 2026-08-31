@@ -65,20 +65,55 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Update Kubeconfig
+      - name: Update Kubeconfig & Ensure Node Group Exists
         run: |
           aws eks update-kubeconfig --name cluster --region us-east-1
+          
+          # Check existing nodegroups
+          NODEGROUPS=$(aws eks list-nodegroups --cluster-name cluster --region us-east-1 --query "nodegroups" --output text)
+          echo "Existing Nodegroups: $NODEGROUPS"
+          
+          if [ -z "$NODEGROUPS" ] || [ "$NODEGROUPS" == "None" ]; then
+            echo "Creating missing Node Group..."
+            SUBNETS=$(aws ec2 describe-subnets --filters "Name=tag:aws:eks:cluster-name,Values=cluster" --query "Subnets[*].SubnetId" --output text | tr '\t' ' ')
+            if [ -z "$SUBNETS" ]; then
+              SUBNETS=$(aws ec2 describe-subnets --query "Subnets[0:2].SubnetId" --output text | tr '\t' ' ')
+            fi
+            
+            aws eks create-nodegroup \
+              --cluster-name cluster \
+              --nodegroup-name cluster-node-group \
+              --subnets $SUBNETS \
+              --node-role arn:aws:iam::262228716411:role/cluster-node-group-2024 \
+              --instance-types t3.medium \
+              --scaling-config minSize=1,maxSize=2,desiredSize=1 \
+              --region us-east-1 || true
+          fi
 
-      - name: Uncordon Nodes
+      - name: Wait for Nodes & Uncordon
         run: |
-          kubectl uncordon $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}') || true
+          echo "Waiting for worker node to register with cluster..."
+          for i in {1..30}; do
+            NODE_COUNT=$(kubectl get nodes --no-headers 2>/dev/null | wc -l)
+            if [ "$NODE_COUNT" -gt 0 ]; then
+              echo "Node joined the cluster!"
+              break
+            fi
+            echo "Waiting for node (attempt $i/30)..."
+            sleep 10
+          done
+          
+          kubectl uncordon $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}') 2>/dev/null || true
 
       - name: Deploy Frontend Manifests
         run: |
           kubectl apply -k starter/frontend/k8s/ || kubectl apply -f starter/frontend/k8s/
           kubectl rollout restart deployment frontend 2>/dev/null || true
+          kubectl rollout restart deployment backend 2>/dev/null || true
 
       - name: Verify Cluster and Pods
         run: |
+          echo "=== Node List ==="
           kubectl get nodes -o wide
+          echo "=== Pod List ==="
           kubectl get pods -A
