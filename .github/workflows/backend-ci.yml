@@ -44,8 +44,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: 'AKIAT2DQMVN5XSMDBYRP'
-          aws-secret-access-key: 'q+uriF4PJY15NChpgfD9iCLbNKMRzahPx+ZIf'
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
       - name: Login to Amazon ECR
@@ -54,7 +54,7 @@ jobs:
 
       - name: Build, Tag, and Push Backend Image
         env:
-          ECR_REGISTRY: 262228716411.dkr.ecr.us-east-1.amazonaws.com
+          ECR_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_BASE }}
           IMAGE_TAG: latest
         run: |
           docker build -t $ECR_REGISTRY/backend:$IMAGE_TAG ./starter/backend
@@ -71,8 +71,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: 'AKIAT2DQMVN5XSMDBYRP'
-          aws-secret-access-key: 'q+uriF4PJY15NChpgfD9iCLbNKMRzahPx+ZIf'
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
       - name: Update Kubeconfig
