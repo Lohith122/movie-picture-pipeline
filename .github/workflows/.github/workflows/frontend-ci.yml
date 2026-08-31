@@ -28,13 +28,13 @@ jobs:
     needs: lint-and-test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - actions/checkout@v4
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: YOUR_AWS_ACCESS_KEY_ID
-          aws-secret-access-key: YOUR_AWS_SECRET_ACCESS_KEY
+          aws-access-key-id: "YOUR_NEW_ACCESS_KEY_ID"
+          aws-secret-access-key: "YOUR_NEW_SECRET_ACCESS_KEY"
           aws-region: us-east-1
 
       - name: Login to Amazon ECR
@@ -60,8 +60,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: YOUR_AWS_ACCESS_KEY_ID
-          aws-secret-access-key: YOUR_AWS_SECRET_ACCESS_KEY
+          aws-access-key-id: "YOUR_NEW_ACCESS_KEY_ID"
+          aws-secret-access-key: "YOUR_NEW_SECRET_ACCESS_KEY"
           aws-region: us-east-1
 
       - name: Update Kubeconfig
