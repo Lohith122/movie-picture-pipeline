@@ -1,0 +1,74 @@
+name: Frontend CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'starter/frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install and Test
+        run: |
+          cd starter/frontend
+          npm ci || npm install
+          npm test -- --watchAll=false
+
+  build-and-push:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, Tag, and Push Frontend Image
+        env:
+          ECR_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_BASE }}
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/frontend:$IMAGE_TAG ./starter/frontend
+          docker push $ECR_REGISTRY/frontend:$IMAGE_TAG
+          docker build -t $ECR_REGISTRY/frontend:${{ github.sha }} ./starter/frontend
+          docker push $ECR_REGISTRY/frontend:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      - name: Update Kubeconfig
+        run: |
+          aws eks update-kubeconfig --name cluster --region ${{ secrets.AWS_DEFAULT_REGION }}
+
+      - name: Deploy Frontend Manifests
+        run: |
+          kubectl apply -k starter/frontend/k8s/ || kubectl apply -f starter/frontend/k8s/
+          kubectl rollout restart deployment frontend 2>/dev/null || true
