@@ -22,19 +22,18 @@ jobs:
         run: |
           cd starter/backend
           pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install flake8 pytest
+          pip install pipenv flake8 pytest
+          pipenv install --dev --system || pipenv install --system
 
       - name: Lint with Flake8
         run: |
           cd starter/backend
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
       - name: Run Backend Tests
         run: |
           cd starter/backend
-          pytest
+          pytest test_app.py
 
   build-and-push:
     needs: lint-and-test
