@@ -192,12 +192,12 @@ data "aws_ssm_parameter" "eks_ami_release_version" {
 }
 
 resource "aws_eks_node_group" "main" {
+  ami_type = "BOTTLEROCKET_x86_64"
   node_group_name = "udacity"
   cluster_name    = aws_eks_cluster.main.name
   version         = aws_eks_cluster.main.version
   node_role_arn   = aws_iam_role.node_group.arn
   subnet_ids      = [var.enable_private == true ? aws_subnet.private_subnet.id : aws_subnet.public_subnet.id]
-  release_version = nonsensitive(data.aws_ssm_parameter.eks_ami_release_version.value)
   instance_types  = ["t3.small"]
 
   scaling_config {
