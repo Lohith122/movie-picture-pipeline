@@ -1,0 +1,43 @@
+name: Backend Continuous Integration
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: starter/backend/package-lock.json
+      - name: Install dependencies
+        run: cd starter/backend && npm ci
+      - name: Run lint
+        run: cd starter/backend && npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: starter/backend/package-lock.json
+      - name: Install dependencies
+        run: cd starter/backend && npm ci
+      - name: Run tests
+        run: cd starter/backend && npm run test
+
+  build:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build Docker Image
+        run: cd starter/backend && docker build -t backend:latest .
