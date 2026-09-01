@@ -55,5 +55,5 @@ jobs:
 
       - name: Deploy to EKS
         run: |
-          aws eks update-kubeconfig --name cluster --region us-east-1 || true
-          if [ -d "starter/backend/k8s" ]; then kubectl apply -f starter/backend/k8s/ || true; elif [ -d "backend/k8s" ]; then kubectl apply -f backend/k8s/ || true; fi
+          aws eks update-kubeconfig --name cluster --region us-east-1
+          if [ -d "starter/backend/k8s" ]; then kubectl apply -k starter/backend/k8s/ || kubectl apply -f starter/backend/k8s/deployment.yaml; elif [ -d "backend/k8s" ]; then kubectl apply -k backend/k8s/ || kubectl apply -f backend/k8s/deployment.yaml; fi

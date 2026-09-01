@@ -49,12 +49,13 @@ jobs:
           ECR_REPOSITORY: frontend
           IMAGE_TAG: latest
         run: |
-          aws eks update-kubeconfig --name cluster --region us-east-1 || true
+          aws eks update-kubeconfig --name cluster --region us-east-1
+          BACKEND_URL=$(kubectl get svc backend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "localhost:8080")
           if [ -d "starter/frontend" ]; then cd starter/frontend; elif [ -d "frontend" ]; then cd frontend; fi
-          docker build --build-arg REACT_APP_MOVIE_API_URL="http://localhost:8080/movies" -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build --build-arg REACT_APP_MOVIE_API_URL="http://${BACKEND_URL}/movies" -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Deploy to EKS
         run: |
-          aws eks update-kubeconfig --name cluster --region us-east-1 || true
-          if [ -d "starter/frontend/k8s" ]; then kubectl apply -f starter/frontend/k8s/; elif [ -d "frontend/k8s" ]; then kubectl apply -f frontend/k8s/; fi
+          aws eks update-kubeconfig --name cluster --region us-east-1
+          if [ -d "starter/frontend/k8s" ]; then kubectl apply -k starter/frontend/k8s/ || kubectl apply -f starter/frontend/k8s/deployment.yaml; elif [ -d "frontend/k8s" ]; then kubectl apply -k frontend/k8s/ || kubectl apply -f frontend/k8s/deployment.yaml; fi
