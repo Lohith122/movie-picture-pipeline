@@ -60,9 +60,20 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Deploy to EKS
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           aws eks update-kubeconfig --name cluster --region us-east-1
           if [ -d "starter/frontend/k8s" ]; then kubectl apply -k starter/frontend/k8s/; elif [ -d "k8s" ]; then kubectl apply -k k8s/; fi
+
+          # Set deployments to use the pushed ECR images
+          kubectl set image deployment/frontend frontend=$ECR_REGISTRY/frontend:latest || true
+          kubectl set image deployment/backend backend=$ECR_REGISTRY/backend:latest || true
+
+          # Wait for pods to transition to Running
+          kubectl rollout status deployment/frontend --timeout=90s || true
+          kubectl rollout status deployment/backend --timeout=90s || true
+
           echo "==================== KUBECTL NODES ===================="
           kubectl get nodes -o wide
           echo "==================== KUBECTL PODS & SERVICES ===================="
