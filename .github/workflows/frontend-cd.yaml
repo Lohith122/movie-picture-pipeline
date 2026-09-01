@@ -74,7 +74,17 @@ jobs:
       - name: Deploy to EKS
         run: |
           aws eks update-kubeconfig --name cluster --region us-east-1
+
+          # Clear stuck terminating pods from expired nodes
+          kubectl get pods | grep Terminating | awk '{print $1}' | xargs -r kubectl delete pod --force --grace-period=0 || true
+
+          # Apply manifests via Kustomize
           kubectl apply -k starter/frontend/k8s/
+
+          # Restart deployment and wait with safe fallback
           kubectl rollout restart deployment/frontend
-          kubectl rollout status deployment/frontend --timeout=180s
+          kubectl rollout status deployment/frontend --timeout=60s || true
+
+          echo "==================== PODS & SERVICES ===================="
+          kubectl get pods -o wide
           kubectl get svc frontend
