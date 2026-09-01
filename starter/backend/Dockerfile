@@ -1,8 +1,11 @@
 FROM public.ecr.aws/docker/library/python:3.10-alpine
+
 ENV FLASK_RUN_HOST=0.0.0.0
 
-WORKDIR /
+WORKDIR /app
+
 RUN adduser -u 1000 -D app
+
 RUN apk update && \
     apk add \
     pcre \
@@ -18,9 +21,8 @@ COPY Pipfile* /app/
 RUN cd /app && pipenv install --system --skip-lock
 
 COPY . /app
-WORKDIR /app
 
 USER app
 EXPOSE 5000
 
-CMD ["python", "app.py"]
+CMD ["python", "movies/app.py"]
