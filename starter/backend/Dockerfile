@@ -1,6 +1,6 @@
 FROM public.ecr.aws/docker/library/python:3.10-alpine
 
-ENV FLASK_APP=movies
+ENV FLASK_APP=movies:create_app
 ENV FLASK_RUN_HOST=0.0.0.0
 ENV FLASK_RUN_PORT=5000
 
