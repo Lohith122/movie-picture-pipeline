@@ -62,7 +62,7 @@ jobs:
       - name: Deploy to EKS
         run: |
           aws eks update-kubeconfig --name cluster --region us-east-1
-          if [ -d "starter/frontend/k8s" ]; then kubectl apply -f starter/frontend/k8s/; elif [ -d "k8s" ]; then kubectl apply -f k8s/; fi
+          if [ -d "starter/frontend/k8s" ]; then kubectl apply -k starter/frontend/k8s/; elif [ -d "k8s" ]; then kubectl apply -k k8s/; fi
           echo "==================== KUBECTL NODES ===================="
           kubectl get nodes -o wide
           echo "==================== KUBECTL PODS & SERVICES ===================="
