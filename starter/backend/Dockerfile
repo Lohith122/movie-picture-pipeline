@@ -13,4 +13,4 @@ COPY . /app
 
 EXPOSE 5000
 
-CMD ["python", "-c", "from flask import Flask; from flask_cors import CORS; from movies.movies_api import movies_api; app = Flask(__name__); CORS(app); app.register_blueprint(movies_api); app.run(host='0.0.0.0', port=5000)"]
+CMD ["python", "-c", "from flask import Flask; from flask_cors import CORS; from movies.resources import Movies; app = Flask(__name__); CORS(app); view = Movies.as_view('movies'); app.add_url_rule('/movies/movies', defaults={'movie_id': None}, view_func=view, methods=['GET', 'POST']); app.add_url_rule('/movies', defaults={'movie_id': None}, view_func=view, methods=['GET', 'POST']); app.add_url_rule('/', defaults={'movie_id': None}, view_func=view, methods=['GET', 'POST']); app.run(host='0.0.0.0', port=5000)"]
