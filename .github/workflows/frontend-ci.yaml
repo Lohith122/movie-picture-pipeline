@@ -2,48 +2,99 @@ name: Frontend Continuous Integration
 
 on:
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup NodeJS
+        uses: actions/setup-node@v3
         with:
           node-version: 18
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('starter/frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
       - name: Install dependencies
         run: |
-          if [ -d "starter/frontend" ]; then cd starter/frontend; elif [ -d "frontend" ]; then cd frontend; fi
-          npm install || true
-      - name: Run lint
+          cd starter/frontend
+          npm ci
+
+      - name: Run lint command
         run: |
-          if [ -d "starter/frontend" ]; then cd starter/frontend; elif [ -d "frontend" ]; then cd frontend; fi
-          npm run lint -- --fix || npm run lint || true
+          cd starter/frontend
+          npm run lint
 
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup NodeJS
+        uses: actions/setup-node@v3
         with:
           node-version: 18
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('starter/frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
       - name: Install dependencies
         run: |
-          if [ -d "starter/frontend" ]; then cd starter/frontend; elif [ -d "frontend" ]; then cd frontend; fi
-          npm install || true
-      - name: Run tests
+          cd starter/frontend
+          npm ci
+
+      - name: Run test command
         run: |
-          if [ -d "starter/frontend" ]; then cd starter/frontend; elif [ -d "frontend" ]; then cd frontend; fi
-          CI=true npm test -- --passWithNoTests || npm test || true
+          cd starter/frontend
+          npm run test -- --passWithNoTests --watchAll=false
 
   build:
     needs: [lint, test]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup NodeJS
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('starter/frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: |
+          cd starter/frontend
+          npm ci
+
+      - name: Run npm build command
+        run: |
+          cd starter/frontend
+          npm run build
+
       - name: Build Docker Image
         run: |
-          if [ -d "starter/frontend" ]; then cd starter/frontend; elif [ -d "frontend" ]; then cd frontend; fi
-          docker build -t frontend:latest .
+          docker build -t frontend:latest starter/frontend
