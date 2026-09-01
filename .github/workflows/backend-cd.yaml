@@ -57,7 +57,7 @@ jobs:
       - name: Deploy to EKS & Verify
         run: |
           aws eks update-kubeconfig --name cluster --region us-east-1
-          kubectl apply -f starter/backend/k8s/
+          kubectl apply -k starter/backend/k8s/
           kubectl rollout restart deployment/backend
           echo "Waiting for rollout..."
           kubectl rollout status deployment/backend --timeout=90s
