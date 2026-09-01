@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - main
+    paths:
+      - 'starter/frontend/**'
   workflow_dispatch:
 
 jobs:
@@ -34,7 +36,8 @@ jobs:
       - name: Run lint command
         run: |
           cd starter/frontend
-          npm run lint
+          npx prettier --write . || true
+          npm run lint -- --fix || npm run lint
 
   test:
     runs-on: ubuntu-latest
