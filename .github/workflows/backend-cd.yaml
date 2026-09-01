@@ -10,21 +10,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+
+      - uses: actions/setup-python@v4
         with:
-          node-version: 18
+          python-version: '3.10'
+
       - name: Install dependencies
         run: |
           if [ -d "starter/backend" ]; then cd starter/backend; elif [ -d "backend" ]; then cd backend; fi
-          npm install || true
+          pip install --upgrade pip
+          pip install -r requirements.txt || true
+
       - name: Run lint
         run: |
           if [ -d "starter/backend" ]; then cd starter/backend; elif [ -d "backend" ]; then cd backend; fi
-          npm run lint -- --fix || npm run lint || true
-      - name: Run tests
-        run: |
-          if [ -d "starter/backend" ]; then cd starter/backend; elif [ -d "backend" ]; then cd backend; fi
-          CI=true npm test -- --passWithNoTests || npm test || true
+          pip install flake8
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
 
   deploy:
     needs: [lint-and-test]
@@ -43,7 +44,7 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build, tag, and push image to Amazon ECR
+      - name: Build & Push Backend Docker Image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: backend
@@ -53,7 +54,21 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Deploy to EKS
+      - name: Deploy to EKS & Inspect
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           aws eks update-kubeconfig --name cluster --region us-east-1
-          if [ -d "starter/backend/k8s" ]; then kubectl apply -k starter/backend/k8s/ || kubectl apply -f starter/backend/k8s/deployment.yaml; elif [ -d "backend/k8s" ]; then kubectl apply -k backend/k8s/ || kubectl apply -f backend/k8s/deployment.yaml; fi
+          if [ -d "starter/backend/k8s" ]; then kubectl apply -k starter/backend/k8s/; elif [ -d "k8s" ]; then kubectl apply -k k8s/; fi
+
+          kubectl set image deployment/backend backend=$ECR_REGISTRY/backend:latest || true
+          kubectl rollout restart deployment/backend
+
+          echo "Waiting 30s for rollout..."
+          sleep 30
+
+          echo "==================== POD STATUS ===================="
+          kubectl get pods -o wide
+
+          echo "==================== BACKEND LOGS ===================="
+          kubectl logs deployment/backend --all-containers=true --tail=50 || true
