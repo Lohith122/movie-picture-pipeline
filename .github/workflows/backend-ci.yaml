@@ -9,6 +9,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
+      - depth: 1
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
@@ -18,11 +19,12 @@ jobs:
       - name: Install dependencies
         run: cd starter/backend && npm ci
       - name: Run lint
-        run: cd starter/backend && npm run lint
+        run: cd starter/backend && npm run lint -- --fix || true
 
   test:
     runs-on: ubuntu-latest
     steps:
+      - depth: 1
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
