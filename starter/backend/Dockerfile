@@ -1,6 +1,8 @@
 FROM public.ecr.aws/docker/library/python:3.10-alpine
 
+ENV FLASK_APP=movies
 ENV FLASK_RUN_HOST=0.0.0.0
+ENV FLASK_RUN_PORT=5000
 
 WORKDIR /app
 
@@ -18,11 +20,11 @@ RUN apk update && \
     && pip install pipenv
 
 COPY Pipfile* /app/
-RUN cd /app && pipenv install --system --skip-lock
+RUN cd /app && pipenv install --system --skip-lock || pip install Flask gunicorn flask-cors requests
 
 COPY . /app
 
 USER app
 EXPOSE 5000
 
-CMD ["python", "movies/app.py"]
+CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=5000"]
