@@ -51,10 +51,14 @@ jobs:
           IMAGE_TAG: latest
         run: |
           if [ -d "starter/backend" ]; then cd starter/backend; elif [ -d "backend" ]; then cd backend; fi
+          
+          echo "=== Backend directory structure ==="
+          find . -maxdepth 3
+          
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Deploy to EKS & Inspect
+      - name: Deploy to EKS & Verify
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
@@ -63,12 +67,12 @@ jobs:
 
           kubectl set image deployment/backend backend=$ECR_REGISTRY/backend:latest || true
           kubectl rollout restart deployment/backend
-
-          echo "Waiting 30s for rollout..."
-          sleep 30
+          
+          echo "Waiting 35s for rollout..."
+          sleep 35
 
           echo "==================== POD STATUS ===================="
           kubectl get pods -o wide
 
           echo "==================== BACKEND LOGS ===================="
-          kubectl logs deployment/backend --all-containers=true --tail=50 || true
+          kubectl logs deployment/backend --all-containers=true --tail=20 || true
