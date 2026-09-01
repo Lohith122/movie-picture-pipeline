@@ -2,36 +2,37 @@ name: Backend Continuous Deployment
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+    paths:
+      - 'starter/backend/**'
   workflow_dispatch:
 
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - uses: actions/setup-python@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Install dependencies & Lint
         run: |
-          if [ -d "starter/backend" ]; then cd starter/backend; elif [ -d "backend" ]; then cd backend; fi
-          pip install --upgrade pip
-          pip install -r requirements.txt || true
-
-      - name: Run lint
-        run: |
-          if [ -d "starter/backend" ]; then cd starter/backend; elif [ -d "backend" ]; then cd backend; fi
-          pip install flake8
+          python -m pip install --upgrade pip
+          pip install flake8 pytest
+          cd starter/backend
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
 
-  deploy:
-    needs: [lint-and-test]
+  build-and-deploy:
+    needs: lint-and-test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -50,29 +51,17 @@ jobs:
           ECR_REPOSITORY: backend
           IMAGE_TAG: latest
         run: |
-          if [ -d "starter/backend" ]; then cd starter/backend; elif [ -d "backend" ]; then cd backend; fi
-          
-          echo "=== Backend directory structure ==="
-          find . -maxdepth 3
-          
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG starter/backend/
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Deploy to EKS & Verify
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           aws eks update-kubeconfig --name cluster --region us-east-1
-          if [ -d "starter/backend/k8s" ]; then kubectl apply -k starter/backend/k8s/; elif [ -d "k8s" ]; then kubectl apply -k k8s/; fi
-
-          kubectl set image deployment/backend backend=$ECR_REGISTRY/backend:latest || true
+          kubectl apply -f starter/backend/k8s/
           kubectl rollout restart deployment/backend
-          
-          echo "Waiting 35s for rollout..."
-          sleep 35
-
+          echo "Waiting for rollout..."
+          kubectl rollout status deployment/backend --timeout=90s
           echo "==================== POD STATUS ===================="
           kubectl get pods -o wide
-
-          echo "==================== BACKEND LOGS ===================="
-          kubectl logs deployment/backend --all-containers=true --tail=20 || true
+          echo "==================== SERVICE URL ===================="
+          kubectl get svc backend
