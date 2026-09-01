@@ -1,8 +1,9 @@
 FROM public.ecr.aws/docker/library/python:3.10-alpine
 
-ENV FLASK_APP=movies:create_app
+ENV FLASK_APP=movies:app
 ENV FLASK_RUN_HOST=0.0.0.0
 ENV FLASK_RUN_PORT=5000
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
@@ -27,4 +28,4 @@ COPY . /app
 USER app
 EXPOSE 5000
 
-CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=5000"]
+CMD ["sh", "-c", "gunicorn -b 0.0.0.0:5000 'movies:app' || python -m flask run --host=0.0.0.0 --port=5000 || python movies/__init__.py"]
